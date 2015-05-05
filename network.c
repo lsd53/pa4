@@ -1,8 +1,11 @@
 #include "kernel.h"
 
 
-//define the size of the ring buffer
+//define the size of the ring and each buffer inside it
 #define RING_SIZE 16
+#define BUFFER_SIZE 4096
+
+
 
 // pointer to memory-mapped I/0 region for network driver
 volatile struct network_dev *dev_net
@@ -18,6 +21,12 @@ void network_init(){
   }
   /* allocate room for ring buffer and set rx_base to start of the array */
   struct dma_ring_slot* ring=(struct dma_ring_slot*) malloc(sizeof(struct dma_ring_slot) * RING_SIZE);
-  dev_net[8] = 
-
+  dev_net[8] = virtual_to_physical((void *) ring);
+  
+  /* allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values */
+  for (i = 0; i < RING_SIZE; i++) {
+    void* space = malloc(BUFFER_SIZE);
+    ring[i].dma_base = virtual_to_physical((void *) space);
+    ring[i].dma_len = BUFFER_SIZE;
+  }
 }
