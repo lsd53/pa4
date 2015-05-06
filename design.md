@@ -1,6 +1,6 @@
 ---
 title: CS 3410, Project 4 Design Document
-author: Luis Gustavo de Medeiros (lsd53), Ajay Gandhi (aag255)
+author: Luis De Medeiros (lsd53), Ajay Gandhi (aag255)
 header-includes:
     - \usepackage{fancyhdr}
     - \pagestyle{fancy}
@@ -18,13 +18,12 @@ plans for the project and covers design choices (e.g. interrupts vs polling).
 We decided to use a polling system to handle the packets. This approach requires
 extra communication between cores, which will be covered later in the document.
 
-In addition to polling, we took advantage of the information learned during PA1
-and PA2 to create a pipelined system for handling the packets. The first core
-receives the packets and writes them to a synchronized ring buffer. The second
-core hashes the packet, classifying it and writing this new information to a
-second synchronized buffer. The third core reads the categorized packets and
-updates hashtables corresponding to each datatype. The last core also handles
-command and print packets accordingly.
+In addition to polling, we plan to take advantage of the synchronization
+primitives learned in class to create a parallelized packet handling system.
+The first core takes packets from the ring buffer and places them into a queue.
+Each core, in parallel, removes a packet from this queue when available and
+analyzes the packet, updating the appropriate statistics or executing the
+command.
 
 ## Why Polling?
 
@@ -46,14 +45,16 @@ Two main datastructures will be used to implement the honeypot.
 The first datastructure is a simple hashtable, almost identical to that created
 in Homework 2. There will be multiple instances of the hashtable; each will be
 used to keep track of a its own type of packet. For instance, one hashtable will
-be dedicated to keeping track of evil packets and their hashes.
+be dedicated to keeping track of evil packets and their hashes. Because of the
+parallelized nature of the system, the hashtable must be synchronized; that is,
+only one core should be able to write at a time.
 
-The second datastructure is a synchronized ring buffer. This datastructure is
-used to keep track of packets between cores. Because the cores act as stages in
-a pipeline, the structure holding data between the pipeline must be
-synchronized. Additionally, in contrast to the MIPS processor, these pipelines
-do act on the same clock cycle. Because packets can arrive at any time and in
-any volume, they must be queued into a datastructure capable of handling this.
-Therefore, the synchronized ring buffer can both carry large amounts of packets
-and maintain synchronization between stages.
+The second datastructure is a synchronized queue. This datastructure is used to
+keep track of packets between cores. Because the cores act in parallel, only
+each core should be able to pop a packet off the queue; this is the only
+operation for which the queue should be locked. Additionally, only one core will
+be pushing to the queue (the rest will be popping). This datastructure is
+especially significant because it will allow the system to handle large bursts
+of network activity - it can simply write each packet to the queue, which is
+capable of holding a much larger number of packets than the ring buffer.
 
