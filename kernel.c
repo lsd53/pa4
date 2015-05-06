@@ -154,6 +154,12 @@ void __boot() {
     for (int i = 0; i < 32; i++)
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 
+    //initiliaze network driver and polling
+    network_init();
+    network_start_receive();
+    network_poll();
+
+
   } else {
     /* remaining cores boot after core 0 turns them on */
 

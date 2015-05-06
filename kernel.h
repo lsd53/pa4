@@ -5,6 +5,7 @@
 #include "honeypot.h"
 #include "console.h"
 #include "keyboard.h"
+#include "network.h"
 
 /* This is used by the trap handler to save the CPU state
  * Note: So long as trap handlers do not touch any coprocessor state (e.g.
