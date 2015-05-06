@@ -3,12 +3,12 @@
 
 //define the size of the ring and each buffer inside it
 #define RING_SIZE 16
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 4096 // ask about buffer size
 
 
 
 // pointer to memory-mapped I/0 region for network driver
-volatile struct network_dev *dev_net
+volatile struct network_dev *dev_net;
 
 void network_init(){
   /* Find virtual address of I/0 region for network driver */
@@ -25,7 +25,7 @@ void network_init(){
   dev_net->rx_capacity = RING_SIZE;  
 
   /* allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values */
-  for (i = 0; i < RING_SIZE; i++) {
+  for (int i = 0; i < RING_SIZE; i++) {
     void* space = malloc(BUFFER_SIZE);
     ring[i].dma_base = virtual_to_physical((void *) space);
     ring[i].dma_len = BUFFER_SIZE;
@@ -38,8 +38,22 @@ void network_start_recieve(){
   dev_net->data = 1;
  
   // allow network card to recieve packets 
-  dev_net->cmd = NET_SET_RECEIVE
+  dev_net->cmd = NET_SET_RECEIVE;
   dev_net->data = 1; 
 }
 
+void network_set_interrupts(int opt){
 
+}
+
+
+
+void network_poll(){
+  while (dev_net->rx_head != dev_net->rx_tail){
+    } 
+}
+
+
+void network_trap(){
+
+}
