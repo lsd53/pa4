@@ -1,44 +1,81 @@
-// TODO: Inserting first element, removing last
-// Queue data structure implemented using LinkedList
+#include <stdlib.h>
 
-typedef struct ListNode {
+// Queue data structure implemented using LinkedList
+// Implemented from scratch
+
+typedef struct Node {
   void* data;
-  ListNode* next;
-} ListNode;
+  struct Node* next;
+} Node;
 
 typedef struct Queue {
-  void* head;
-  void* tail;
+  Node* head;
+  Node* tail;
 } Queue;
 
+/**
+ * Returns a new, empty queue
+ */
 Queue* queue_new() {
   // Alloc a new queue
-  Queue&* new_queue = (Queue*)malloc(sizeof(Queue));
+  Queue* new_queue = (Queue*)malloc(sizeof(Queue));
+  new_queue->head = NULL;
+  new_queue->tail = NULL;
   return new_queue;
 }
 
-void queue_push(Queue* q, void* new_data) {
-  // Push the new data onto the queue as a ListNode
-  // Update rear next pointer
+/**
+ * Loops over all elements and frees them, effectively deleting the queue
+ */
+void queue_delete(Queue* q) {
+  while (q->head != NULL) {
+    // Get head
+    Node* first = q->head;
 
-  // Create new ListNode
-  ListNode* new_node = (ListNode*)malloc(sizeof(ListNode));
-  new_node->data = new_data;
-
-  // Update pointer in queue
-  q->tail->next = new_node;
-  q->tail = new_node
+    // Update head in queue then free
+    q->head = first->next;
+    free(first);
+  }
 }
 
+/**
+ * Pushes a new value onto the queue
+ */
+void queue_push(Queue* q, void* new_data) {
+  // Create new Node
+  Node* new_node = (Node*)malloc(sizeof(Node));
+  new_node->data = new_data;
+  new_node->next = NULL;
+
+  if (q->head == NULL) {
+    // Set head and tail if queue empty
+    q->head = new_node;
+    q->tail = new_node;
+
+  } else {
+    // Update pointer in queue
+    q->tail->next = new_node;
+    q->tail = new_node;
+
+  }
+}
+
+/**
+ * Pops a value off the queue
+ */
 void* queue_pop(Queue* q) {
-  // Remove head of queue set head to head->next
+  // Return NULL if empty queue
+  if (q->head == NULL) {
+    return NULL;
+  }
+
   // Get head
-  ListNode* first = q->head;
+  Node* first = q->head;
 
   // Update head in queue
   q->head = first->next;
 
-  // Get data and free ListNode
+  // Get data and free Node
   void* data = first->data;
   free(first);
   return data;
