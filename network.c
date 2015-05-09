@@ -59,7 +59,8 @@ void network_poll(){
     if (net_driver->rx_head != net_driver->rx_tail){
       // access the buffer at the ring slot and retrieve the packet
       void* space = malloc(BUFFER_SIZE);
-      ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space); 
+      ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
+      ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE; 
       net_driver->rx_tail+=1;  
     /*  for (int i = 0; i < ring[net_driver->rx_tail % RING_SIZE].dma_len; i++){
   
