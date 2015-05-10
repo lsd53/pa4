@@ -150,7 +150,7 @@ void __boot() {
     set_cpu_enable(0xFFFFFFFF);
 
     // see which cores got turned on
-    busy_wait(0.1);
+    busy_wait(0.4);
     for (int i = 0; i < 32; i++)
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 

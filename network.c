@@ -58,11 +58,16 @@ void network_poll(){
   while(1){ 
     if (net_driver->rx_head != net_driver->rx_tail){
       // access the buffer at the ring slot and retrieve the packet
+      void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
+      free(packet);
       void* space = malloc(BUFFER_SIZE);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE; 
       net_driver->rx_tail+=1;  
-    /*  for (int i = 0; i < ring[net_driver->rx_tail % RING_SIZE].dma_len; i++){
+      
+      // free memory used up by packet 
+      
+	/*  for (int i = 0; i < ring[net_driver->rx_tail % RING_SIZE].dma_len; i++){
   
     } */
       
