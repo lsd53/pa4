@@ -1,11 +1,13 @@
 #include <stddef.h>
 #include "kernel.h"
+#include "queue.h"
 
 // Queue data structure implemented using LinkedList
 // Implemented from scratch
 
 typedef struct Node {
   void* data;
+  int length;
   struct Node* next;
 } Node;
 
@@ -42,12 +44,12 @@ void queue_delete(Queue* q) {
 /**
  * Pushes a new value onto the queue
  */
-void queue_push(Queue* q, void* new_data) {
+void queue_push(Queue* q, void* new_data,int length) {
   // Create new Node
   Node* new_node = (Node*)malloc(sizeof(Node));
   new_node->data = new_data;
   new_node->next = NULL;
-
+  new_node->length = length;
   if (q->head == NULL) {
     // Set head and tail if queue empty
     q->head = new_node;

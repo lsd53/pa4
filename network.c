@@ -1,5 +1,5 @@
 #include "kernel.h"
-
+#include "queue.h"
 
 //define the size of the ring and each buffer inside it
 #define RING_SIZE 16
@@ -52,13 +52,18 @@ void network_set_interrupts(int opt){
 
 
 
-void network_poll(){
+void network_poll(Queue* q){
   //int k=0;
   struct dma_ring_slot* ring= (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
   while(1){ 
     if (net_driver->rx_head != net_driver->rx_tail){
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
+
+      // store the packet in a queue for buffering by other cores
+      queue_push(q, packet,ring[net_driver->rx_tail % RING_SIZE].dma_len);  
+   
+   
       free(packet);
       void* space = malloc(BUFFER_SIZE);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
