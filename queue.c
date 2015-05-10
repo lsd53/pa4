@@ -1,4 +1,5 @@
-#include <stdlib.h>
+#include <stddef.h>
+#include "kernel.h"
 
 // Queue data structure implemented using LinkedList
 // Implemented from scratch
