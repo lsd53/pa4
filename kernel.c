@@ -1,5 +1,6 @@
 #include "kernel.h"
 #include "queue.h"
+#include "ring_buff.h"
 
 struct bootparams *bootparams;
 
@@ -156,12 +157,11 @@ void __boot() {
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 
 
-    // initiliaze queue for buffering of packets by other cores
-    Queue* first_queue = queue_new();
+   
     //initiliaze network driver and polling
-    network_init();
+    network_init(28);
     network_start_receive();
-    network_poll(first_queue);
+    network_poll();
 
 
   } else {

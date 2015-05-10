@@ -5,16 +5,7 @@
 // Queue data structure implemented using LinkedList
 // Implemented from scratch
 
-typedef struct Node {
-  void* data;
-  int length;
-  struct Node* next;
-} Node;
 
-typedef struct Queue {
-  Node* head;
-  Node* tail;
-} Queue;
 
 /**
  * Returns a new, empty queue
