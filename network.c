@@ -34,7 +34,18 @@ void network_init(int cores_reading){
   ring_buffer=(struct ring_buff*) malloc(sizeof(struct ring_buff) * cores_reading);
   
   // initiaze correct values for ring buffers allocated
-  for(int i = 0 ; i < cores_reading; i++){
+  ring_buffer->ring_capacity = 30;
+  ring_buffer->ring_head = 0;
+  ring_buffer->ring_tail=0;
+  ring_buffer->ring_base=(struct ring_slot*) malloc(sizeof(struct ring_slot)*ring_buffer->ring_capacity);
+  for (int i= 0; i < ring_buffer->ring_capacity; i++){
+  ring_buffer->ring_base[i].dma_base = malloc(BUFFER_SIZE);
+  ring_buffer->ring_base[i].dma_len = BUFFER_SIZE;
+
+
+  }
+
+  /*for(int i = 0 ; i < cores_reading; i++){
     ring_buffer[i].ring_capacity = 10;
     ring_buffer[i].ring_head = 0;
     ring_buffer[i].ring_tail = 0;
@@ -44,14 +55,16 @@ void network_init(int cores_reading){
       ring_buffer[i].ring_base[j].dma_base = malloc(BUFFER_SIZE);
       ring_buffer[i].ring_base[j].dma_len = BUFFER_SIZE;
     }  
-  }
-  /* allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values */
+  }*/
+  // allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values 
   for (int i = 0; i < RING_SIZE; i++) {
     void* space = malloc(BUFFER_SIZE);
     ring[i].dma_base = virtual_to_physical((void *) space);
     ring[i].dma_len = BUFFER_SIZE;
   }
-  puts("...keyboard driver is ready.");
+ 
+  
+  puts("...network driver is ready.");
 }
 
 void network_start_receive(){
@@ -73,30 +86,22 @@ void network_set_interrupts(int opt){
 
 
 void network_poll(){
-  //int k=0;
   struct dma_ring_slot* ring= (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
   while(1){ 
     if (net_driver->rx_head != net_driver->rx_tail){
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
+      ring_buffer->ring_base[ring_buffer->ring_head % ring_buffer->ring_capacity].dma_base = packet;
+      ring_buffer->ring_head+=1;   
       
-      // store the packet in a queue for buffering by other cores
-      //int head = ring_buffer[4].ring_head; 
-      ring_buffer[4].ring_base->dma_base = packet;
-      //ring_queue[head % ring_buffer->ring_capacity].dma_len = ring[net_driver->rx_tail % RING_SIZE].dma_len;
-      ring_buffer[4].ring_head+=1;
-      free(packet);  
+ 
+      //free(packet);  
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
       void* space = malloc(BUFFER_SIZE);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE; 
       net_driver->rx_tail+=1;  
-      
-      // free memory used up by packet 
-      
-	/*  for (int i = 0; i < ring[net_driver->rx_tail % RING_SIZE].dma_len; i++){
-  
-    } */
+
       
       puts("Received packet");
     }
