@@ -26,7 +26,7 @@ void network_init(int cores_reading){
   /* allocate room for ring buffer and set rx_base to start of the array */
   struct dma_ring_slot* ring=(struct dma_ring_slot*) malloc(sizeof(struct dma_ring_slot) * RING_SIZE);
   net_driver->rx_base =  virtual_to_physical((void *) ring); //ASK ABOUT THIS PART
-  net_driver->rx_capacity = RING_SIZE;  
+  net_driver->rx_capacity = RING_SIZE;
 
   /*for(int i = 0 ; i < cores_reading; i++){
     ring_buffer[i].ring_capacity = 10;
@@ -37,16 +37,16 @@ void network_init(int cores_reading){
     for(int j = 0; i < 10 ; i++){
       ring_buffer[i].ring_base[j].dma_base = malloc(BUFFER_SIZE);
       ring_buffer[i].ring_base[j].dma_len = BUFFER_SIZE;
-    }  
+    }
   }*/
-  // allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values 
+  // allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values
   for (int i = 0; i < RING_SIZE; i++) {
     void* space = malloc(BUFFER_SIZE);
     ring[i].dma_base = virtual_to_physical((void *) space);
     ring[i].dma_len = BUFFER_SIZE;
   }
- 
-  
+
+
   puts("...network driver is ready.");
 }
 
@@ -55,10 +55,10 @@ void network_start_receive(){
   net_driver->cmd = NET_SET_POWER;
   net_driver->data = 1;
   puts("Network card on");
- 
-  // allow network card to recieve packets 
+
+  // allow network card to recieve packets
   net_driver->cmd = NET_SET_RECEIVE;
-  net_driver->data = 1; 
+  net_driver->data = 1;
   puts("Ready to start receiving packets");
 }
 
@@ -68,27 +68,22 @@ void network_set_interrupts(int opt){
 
 
 void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
-  int which_core = 0;
-  struct dma_ring_slot* ring = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
+  struct dma_ring_slot* ring = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
   while (1) {
     if ((net_driver->rx_head % net_driver->rx_capacity) == (net_driver->rx_tail % net_driver->rx_capacity)) {
-      int index = which_core % cores_reading;
+      int index = net_driver->rx_tail % cores_reading;
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
       int ring_index = ring_buffers[index]->ring_head % ring_buffers[index]->ring_capacity;
-      (ring_buffers[index]->ring_base[ring_index]).dma_base = packet;
+      ring_buffers[index]->ring_base[ring_index].dma_base = packet;
       ring_buffers[index]->ring_head++;
- 
+
       free(packet);
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
       void* space = malloc(BUFFER_SIZE);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
-      ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE; 
-      net_driver->rx_tail+=1;  
-
-      which_core++;
-
-      // puts("Received packet");
+      ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
+      net_driver->rx_tail++;
     }
   }
 }

@@ -241,6 +241,7 @@ void __boot() {
 
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
+
         // access the buffer at the ring slot and retrieve the packet
         struct ring_slot* ring = (struct ring_slot*) ring_buffer->ring_base;
         int ring_index = ring_buffer->ring_tail % ring_buffer->ring_capacity;
