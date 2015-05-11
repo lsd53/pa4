@@ -36,11 +36,7 @@ void arraylist_add(arraylist* a, void* x) {
     // Malloc new space, copy elements, free old space
     void** old_space = a->buffer;
     a->buffer = (void**) malloc(sizeof(void*) * a->buffer_size);
-
-    int i;
-    for (i = 0; i < a->length; i++) {
-      a->buffer[i] = old_space[i];
-    }
+    memcpy(a->buffer, old_space, sizeof(void*) * a->length);
 
     free(old_space);
   }
@@ -57,7 +53,6 @@ arraylist* arraylist_new() {
   a->buffer = (void**)malloc(2 * sizeof(void*));
   a->buffer_size = 2;
   a->length = 0;
-  a->lock = malloc(sizeof(int));
 
   return a;
 }
@@ -94,31 +89,32 @@ unsigned int hash(unsigned int a) {
 }
 
 void hashtable_create(struct hashtable *self) {
-  // Add 4 buckets initially
+  // Add 2 buckets initially
   self->buckets = arraylist_new();
   arraylist_add(self->buckets, arraylist_new());
   arraylist_add(self->buckets, arraylist_new());
-  arraylist_add(self->buckets, arraylist_new());
-  arraylist_add(self->buckets, arraylist_new());
 
-  self->n           = 4;
+  self->n           = 2;
   self->length      = 0;
   self->num_inserts = 0;
+  self->lock        = (int*) malloc(sizeof(int));
+  *(self->lock)     = 0;
 }
 
 void hashtable_put(struct hashtable *self, int key, int value) {
+  // hashtable_stats(self);
   pair* element  = (pair*)malloc(sizeof(pair));
   element->key   = key;
   element->value = value;
 
   int h = hash(key);
 
-  // Wait if hashtable is resizing
-  while (self->resizing);
+  mutex_lock(self->lock);
+
+  self->num_inserts++;
+  self->length++;
 
   if (((double)self->length / (double)self->n) > 0.75) {
-    self->resizing = 1;
-
     // Have to realloc
     self->n *= 2;
     arraylist* new_buckets = arraylist_new();
@@ -132,8 +128,6 @@ void hashtable_put(struct hashtable *self, int key, int value) {
     // Rehash all elements
     for (i = 0; i < (self->n / 2); i++) {
       arraylist* current = arraylist_get(self->buckets, i);
-
-      mutex_lock(current->lock);
 
       int j;
       for (j = 0; j < current->length; j++) {
@@ -149,21 +143,15 @@ void hashtable_put(struct hashtable *self, int key, int value) {
 
       }
 
-      mutex_unlock(current->lock);
-
       // Free each bucket
       arraylist_free(current);
     }
 
-    self->buckets = new_buckets;
-    self->resizing = 0;
-
     // Free the buckets arraylist
     arraylist_free(self->buckets);
-  }
 
-  self->num_inserts++;
-  self->length++;
+    self->buckets = new_buckets;
+  }
 
   // Check if key already exists
   int overwrite = 0;
@@ -171,8 +159,6 @@ void hashtable_put(struct hashtable *self, int key, int value) {
 
   int which_bucket = h % self->n;
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
-
-  mutex_lock(bucket->lock);
 
   for (i = 0; i < bucket->length; i++) {
     pair* each = arraylist_get(bucket, i);
@@ -188,52 +174,45 @@ void hashtable_put(struct hashtable *self, int key, int value) {
   // Add to bucket if nothing overwritten
   if (!overwrite) arraylist_add(bucket, element);
 
-  mutex_unlock(bucket->lock);
+  mutex_unlock(self->lock);
 }
 
 int hashtable_get(struct hashtable *self, int key) {
-  int i;
   int h = hash(key);
 
-  // Wait if hashtable is resizing
-  while (self->resizing);
+  mutex_lock(self->lock);
 
   int which_bucket = h % self->n;
 
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
 
-  // Wait for lock on bucket
-  mutex_lock(bucket->lock);
-
+  int i;
   for (i = 0; i < bucket->length; i++) {
     pair* element = arraylist_get(bucket, i);
 
     // Return if keys match
     if (element->key == key) {
-      mutex_unlock(bucket->lock);
+      mutex_unlock(self->lock);
       return element->value;
     }
   }
 
   // Error if nothing returned yet
-  mutex_unlock(bucket->lock);
+  mutex_unlock(self->lock);
   return -1;
 }
 
 void hashtable_remove(struct hashtable *self, int key) {
-  int i;
   int h = hash(key);
 
-  // Wait if hashtable is resizing
-  while (self->resizing);
+  mutex_lock(self->lock);
 
   int which_bucket = h % self->n;
+  int removed = 0;
 
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
 
-  // Wait for lock on bucket
-  mutex_lock(bucket->lock);
-
+  int i;
   for (i = 0; i < bucket->length; i++) {
     pair* element = arraylist_get(bucket, i);
 
@@ -241,9 +220,15 @@ void hashtable_remove(struct hashtable *self, int key) {
     if (element->key == key) {
       arraylist_remove(bucket, i);
       self->length--;
+      removed = 1;
       break;
     }
   }
 
-  mutex_unlock(bucket->lock);
+  mutex_unlock(self->lock);
+}
+
+void hashtable_stats(struct hashtable *self) {
+  // puts("hello");
+  printf("length = %d, N = %d, puts = %d\n", self->length, self->n, self->num_inserts);
 }
