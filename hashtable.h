@@ -4,6 +4,7 @@ typedef struct arraylist {
   void** buffer;            // pointer to allocated memory
   unsigned int buffer_size; // the max number of elements the buffer can hold
   unsigned int length;      // the number of values stored in the list
+  int* lock;
 } arraylist;
 
 void arraylist_add(arraylist* a, void* x);
@@ -31,7 +32,7 @@ typedef struct hashtable {
   unsigned int n;           // number of buckets
   unsigned int length;      // the number of integers stored in the list
   unsigned int num_inserts; // the number of insert operations performed so far
-  int* lock;
+  int resizing;
 } hashtable;
 
 typedef struct pair {
