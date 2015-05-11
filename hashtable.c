@@ -11,7 +11,7 @@ void arraylist_add(arraylist* a, void* x) {
 
     // Malloc new space, copy elements, free old space
     void** old_space = a->buffer;
-    a->buffer = malloc(sizeof(void*) * a->buffer_size);
+    a->buffer = (void**) malloc(sizeof(void*) * a->buffer_size);
 
     int i;
     for (i = 0; i < a->length; i++) {

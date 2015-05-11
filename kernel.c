@@ -1,6 +1,9 @@
 #include "kernel.h"
-#include "queue.h"
 #include "ring_buff.h"
+#include "hashtable.h"
+
+#define BUFFER_SIZE 4096 // ask about buffer size
+#define CORES_READING 28
 
 struct bootparams *bootparams;
 
@@ -13,6 +16,37 @@ void shutdown() {
   while (1);
 }
 
+/* Hash function */
+unsigned long djb2(unsigned char *pkt, int n) {
+  unsigned long hash = 5381;
+  int i = 0;
+  while (i < n-8) {
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+  }
+  while (i < n)
+    hash = hash * 33 + pkt[i++];
+  return hash;
+}
+
+/* Byte-wise endian switch */
+int switch_endian(unsigned int old) {
+  return  (old << 24) +
+         ((old &  0x00FF0000) >> 8) +
+         ((old &  0x0000FF00) << 8) +
+          (old >> 24);
+}
+
+/* Byte-wise endian switch for short */
+short switch_endian_short(unsigned short old) {
+  return (old >> 8) + (old << 8);
+}
 
 /* Trap handling.
  *
@@ -76,39 +110,39 @@ void trap_handler(struct mips_core_data *state, unsigned int status, unsigned in
   // diagnose the cause of the trap
   int ecode = (cause & 0x7c) >> 2;
   switch (ecode) {
-    case ECODE_INT:	  /* external interrupt */
+    case ECODE_INT:   /* external interrupt */
       interrupt_handler(cause);
       return; /* this is the only exception we currently handle; all others cause a shutdown() */
-    case ECODE_MOD:	  /* attempt to write to a non-writable page */
+    case ECODE_MOD:   /* attempt to write to a non-writable page */
       printf("trap_handler: some code is trying to write to a non-writable page!\n");
       break;
-    case ECODE_TLBL:	  /* page fault during load or instruction fetch */
-    case ECODE_TLBS:	  /* page fault during store */
+    case ECODE_TLBL:    /* page fault during load or instruction fetch */
+    case ECODE_TLBS:    /* page fault during store */
       printf("trap_handler: some code is trying to access a bad virtual address!\n");
       break;
-    case ECODE_ADDRL:	  /* unaligned address during load or instruction fetch */
-    case ECODE_ADDRS:	  /* unaligned address during store */
+    case ECODE_ADDRL:   /* unaligned address during load or instruction fetch */
+    case ECODE_ADDRS:   /* unaligned address during store */
       printf("trap_handler: some code is trying to access a mis-aligned address!\n");
       break;
-    case ECODE_IBUS:	  /* instruction fetch bus error */
+    case ECODE_IBUS:    /* instruction fetch bus error */
       printf("trap_handler: some code is trying to execute non-RAM physical addresses!\n");
       break;
-    case ECODE_DBUS:	  /* data load/store bus error */
+    case ECODE_DBUS:    /* data load/store bus error */
       printf("trap_handler: some code is read or write physical address that can't be!\n");
       break;
-    case ECODE_SYSCALL:	  /* system call */
+    case ECODE_SYSCALL:   /* system call */
       printf("trap_handler: who is doing a syscall? not in this project...\n");
       break;
-    case ECODE_BKPT:	  /* breakpoint */
+    case ECODE_BKPT:    /* breakpoint */
       printf("trap_handler: reached breakpoint, or maybe did a divide by zero!\n");
       break;
-    case ECODE_RI:	  /* reserved opcode */
+    case ECODE_RI:    /* reserved opcode */
       printf("trap_handler: trying to execute something that isn't a valid instruction!\n");
       break;
-    case ECODE_OVF:	  /* arithmetic overflow */
+    case ECODE_OVF:   /* arithmetic overflow */
       printf("trap_handler: some code had an arithmetic overflow!\n");
       break;
-    case ECODE_NOEX:	  /* attempt to execute to a non-executable page */
+    case ECODE_NOEX:    /* attempt to execute to a non-executable page */
       printf("trap_handler: some code attempted to execute a non-executable virtual address!\n");
       break;
     default:
@@ -118,6 +152,11 @@ void trap_handler(struct mips_core_data *state, unsigned int status, unsigned in
   shutdown();
 }
 
+
+struct ring_buff* ring_buffer;
+struct hashtable* evil_packets;
+struct hashtable* spammer_packets;
+struct hashtable* vuln_ports;
 
 /* kernel entry point called at the end of the boot sequence */
 void __boot() {
@@ -148,47 +187,131 @@ void __boot() {
     for (int i = 0; i < 32; i++)
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 
-    // turn on all other cores
-    set_cpu_enable(0xFFFFFFFF);
-
     // see which cores got turned on
     busy_wait(0.4);
     for (int i = 0; i < 32; i++)
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 
 
-   
-    //initiliaze network driver and polling
-    network_init(28);
-    network_start_receive();
-    network_poll();
+    // allocate room for ring buffers that are to be used for additional queueing
+    ring_buffer = (struct ring_buff*) malloc(sizeof(struct ring_buff));
 
+    // initiaze correct values for ring buffers allocated
+    ring_buffer->ring_capacity = 30;
+    ring_buffer->ring_head = 0;
+    ring_buffer->ring_tail = 0;
+    ring_buffer->ring_base = (struct ring_slot*) malloc(sizeof(struct ring_slot)*ring_buffer->ring_capacity);
+
+    for (int i= 0; i < ring_buffer->ring_capacity; i++) {
+      ring_buffer->ring_base[i].dma_base = malloc(BUFFER_SIZE);
+      ring_buffer->ring_base[i].dma_len = BUFFER_SIZE;
+    }
+
+    // Init hashtables
+    evil_packets = (struct hashtable*) malloc(sizeof(hashtable));
+    spammer_packets = (struct hashtable*) malloc(sizeof(hashtable));
+    vuln_ports = (struct hashtable*) malloc(sizeof(hashtable));
+    hashtable_create(evil_packets);
+    hashtable_create(spammer_packets);
+    hashtable_create(vuln_ports);
+
+    // turn on all other cores
+    set_cpu_enable(0xFFFFFFFF);
+
+    //initiliaze network driver and polling
+    network_init(CORES_READING);
+    network_start_receive();
+    network_poll(ring_buffer);
 
   } else {
-    /* remaining cores boot after core 0 turns them on */
 
-    // nothing to initialize here... 
+    /**
+     * The remaining cores analyze packets
+     */
+    while (1) {
+      if (ring_buffer->ring_head != ring_buffer->ring_tail) {
+        // access the buffer at the ring slot and retrieve the packet
+        struct ring_slot* ring = (struct ring_slot*) ring_buffer->ring_base;
+        int ring_index = ring_buffer->ring_tail % ring_buffer->ring_capacity;
+        void* packet = ring[ring_index].dma_base;
+
+        unsigned long packet_hash = djb2((unsigned char*) packet, ring[ring_index].dma_len);
+
+        // Check if evil packet
+        int evil_count = hashtable_get(evil_packets, packet_hash);
+        if (evil_count != -1) {
+          // Packet is evil
+          hashtable_put(evil_packets, packet_hash, evil_count + 1);
+        }
+
+        struct honeypot_command_packet* pkt = (struct honeypot_command_packet*) packet;
+
+        // Check if command packet
+        short little_secret = switch_endian_short(pkt->secret_big_endian);
+        if (little_secret == HONEYPOT_SECRET) {
+          // It is a command packet
+          short cmd = switch_endian_short(pkt->cmd_big_endian);
+          int little_data = switch_endian(pkt->data_big_endian);
+
+          switch (cmd) {
+            // Note: Only add the data if it doesn't exist already
+            case HONEYPOT_ADD_SPAMMER:
+              if (hashtable_get(spammer_packets, little_data) == -1)
+                hashtable_put(spammer_packets, little_data, 0);
+              break;
+
+            case HONEYPOT_ADD_EVIL:
+              if (hashtable_get(evil_packets, little_data) == -1)
+                hashtable_put(evil_packets, little_data, 0);
+              break;
+
+            case HONEYPOT_ADD_VULNERABLE:
+              if (hashtable_get(vuln_ports, little_data) == -1)
+                hashtable_put(vuln_ports, little_data, 0);
+              break;
+
+            case HONEYPOT_DEL_SPAMMER:
+              hashtable_remove(spammer_packets, little_data);
+              break;
+
+            case HONEYPOT_DEL_EVIL:
+              hashtable_remove(evil_packets, little_data);
+              break;
+
+            case HONEYPOT_DEL_VULNERABLE:
+              hashtable_remove(vuln_ports, little_data);
+              break;
+
+            case HONEYPOT_PRINT:
+              // Print statistics
+
+              break;
+          }
+
+        }
+
+        // Check if spammer packet
+        int little_src_addr = switch_endian((pkt->headers).ip_source_address_big_endian);
+        int spammer_count = hashtable_get(spammer_packets, little_src_addr);
+        if (spammer_count != -1) {
+          // Packet is spammer, increment count
+          hashtable_put(spammer_packets, little_src_addr, spammer_count + 1);
+        }
+
+        // Check if vulnerable port
+        short little_dest_port = switch_endian_short((pkt->headers).udp_dest_port_big_endian);
+        int vuln_count = hashtable_get(vuln_ports, (int)little_dest_port);
+        if (vuln_count != -1) {
+          // Packet port is vulnerable, increment count
+          hashtable_put(vuln_ports, little_dest_port, vuln_count + 1);
+        }
+
+        // Increment head since packet was read
+        ring[ring_index].dma_len = PAGE_SIZE;
+        ring_buffer->ring_tail++;
+      }
+    }
   }
-
-  printf("Core %d of %d is alive!\n", current_cpu_id(), current_cpu_exists());
-
-  busy_wait(current_cpu_id() * 0.1); // wait a while so messages from different cores don't get so mixed up
-  int size = 64 * 1024 * 4;
-  printf("about to do calloc(%d, 1)\n", size);
-  unsigned int t0  = current_cpu_cycles();
-  calloc(size, 1);
-  unsigned int t1  = current_cpu_cycles();
-  printf("DONE (%u cycles)!\n", t1 - t0);
-
-  while (1) ;
-
-  for (int i = 1; i < 30; i++) {
-    int size = 1 << i;
-    printf("about to do calloc(%d, 1)\n", size);
-    calloc(size, 1);
-  }
-
-
 
   while (1) {
     printf("Core %d is still running...\n", current_cpu_id());
@@ -197,4 +320,3 @@ void __boot() {
 
   shutdown();
 }
-

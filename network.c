@@ -1,5 +1,4 @@
 #include "kernel.h"
-#include "queue.h"
 #include "ring_buff.h"
 
 
@@ -28,22 +27,6 @@ void network_init(int cores_reading){
   struct dma_ring_slot* ring=(struct dma_ring_slot*) malloc(sizeof(struct dma_ring_slot) * RING_SIZE);
   net_driver->rx_base =  virtual_to_physical((void *) ring); //ASK ABOUT THIS PART
   net_driver->rx_capacity = RING_SIZE;  
-
-
-  /* allocate room for ring buffers that are to be used for additional queueing */
-  ring_buffer=(struct ring_buff*) malloc(sizeof(struct ring_buff) * cores_reading);
-  
-  // initiaze correct values for ring buffers allocated
-  ring_buffer->ring_capacity = 30;
-  ring_buffer->ring_head = 0;
-  ring_buffer->ring_tail=0;
-  ring_buffer->ring_base=(struct ring_slot*) malloc(sizeof(struct ring_slot)*ring_buffer->ring_capacity);
-  for (int i= 0; i < ring_buffer->ring_capacity; i++){
-  ring_buffer->ring_base[i].dma_base = malloc(BUFFER_SIZE);
-  ring_buffer->ring_base[i].dma_len = BUFFER_SIZE;
-
-
-  }
 
   /*for(int i = 0 ; i < cores_reading; i++){
     ring_buffer[i].ring_capacity = 10;
@@ -84,18 +67,16 @@ void network_set_interrupts(int opt){
 }
 
 
-
-void network_poll(){
+void network_poll(struct ring_buff* ring_buffer){
   struct dma_ring_slot* ring= (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
-  while(1){ 
-    if (net_driver->rx_head != net_driver->rx_tail){
+  while(1){
+    if ((net_driver->rx_head % net_driver->rx_capacity) == (net_driver->rx_tail % net_driver->rx_capacity)) {
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
       ring_buffer->ring_base[ring_buffer->ring_head % ring_buffer->ring_capacity].dma_base = packet;
       ring_buffer->ring_head+=1;   
-      
  
-      //free(packet);  
+      free(packet);
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
       void* space = malloc(BUFFER_SIZE);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
@@ -103,7 +84,7 @@ void network_poll(){
       net_driver->rx_tail+=1;  
 
       
-      puts("Received packet");
+      // puts("Received packet");
     }
   }
 }
