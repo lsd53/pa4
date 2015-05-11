@@ -28,11 +28,5 @@ void keyboard_trap() {
     // read the character
     char c = dev_kbd->data;
     putchar(c);
-    // if (c == ' ') {
-    //   // then just print it
-    //   print_stats();
-    // }
   }
 }
-
-

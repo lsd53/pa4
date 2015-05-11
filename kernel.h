@@ -141,9 +141,6 @@ void mutex_unlock(int* m);
 void *malloc_safe(unsigned int size);
 void *alloc_pages_safe(unsigned int size);
 
-// Prints stats for the hashtable
-void print_stats();
-
 /* printf.c */
 
 int printf_u(const char *format, ...); // unsynchronized

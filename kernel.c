@@ -199,14 +199,6 @@ struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
 
-int* is_printing;
-void print_stats() {
-  puts("Stats (evil, spammer, vuln):");
-  hashtable_stats(evil_packets);
-  hashtable_stats(spammer_packets);
-  hashtable_stats(vuln_ports);
-}
-
 /* kernel entry point called at the end of the boot sequence */
 void __boot() {
 
