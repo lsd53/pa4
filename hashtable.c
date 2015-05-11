@@ -37,14 +37,14 @@ arraylist* arraylist_new() {
  * Free any memory used by that arraylist.
  */
 void arraylist_free(arraylist* a) {
-  // Hint: How many times is malloc_safe called when creating a new arraylist?
   free(a->buffer);
   free(a);
 }
 
 void arraylist_remove(arraylist* a, unsigned int index) {
-  for (unsigned int i = index; i < a->length - 1; i++)
-      a->buffer[i] = a->buffer[i + 1];
+  unsigned int i;
+  for (i = index; i < a->length - 1; i++)
+    a->buffer[i] = a->buffer[i + 1];
 
   --a->length;
 }
@@ -95,14 +95,15 @@ void hashtable_put(struct hashtable *self, int key, int value) {
     arraylist* new_buckets = arraylist_new();
 
     // Create new arraylist for each bucket
-    int i;
+    unsigned int i;
     for (i = 0; i < self->n; i++) {
       arraylist_add(new_buckets, arraylist_new());
     }
 
     // Rehash all elements
-    for (i = 0; i < (self->n / 2); i++) {
-      arraylist* current = arraylist_get(self->buckets, i);
+    unsigned int k;
+    for (k = 0; k < (self->n / 2); k++) {
+      arraylist* current = arraylist_get(self->buckets, k);
 
       int j;
       for (j = 0; j < current->length; j++) {
@@ -128,26 +129,23 @@ void hashtable_put(struct hashtable *self, int key, int value) {
     self->buckets = new_buckets;
   }
 
-  // Check if key already exists
-  int overwrite = 0;
-  int i;
-
   int which_bucket = h % self->n;
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
 
+  unsigned int i;
   for (i = 0; i < bucket->length; i++) {
     pair* each = arraylist_get(bucket, i);
 
     // Return if keys match
     if (each->key == key) {
-      overwrite = 1;
       self->length--;
-      each->value = value;
+      arraylist_remove(bucket, i);
+      break;
     }
   }
 
-  // Add to bucket if nothing overwritten
-  if (!overwrite) arraylist_add(bucket, element);
+  // Add to bucket
+  arraylist_add(bucket, element);
 
   mutex_unlock(self->lock);
 }

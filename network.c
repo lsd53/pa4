@@ -84,6 +84,7 @@ void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
       int rb_tail = ring_buffer->ring_tail;
 
       if (rb_head != rb_tail && (rb_head % ring_buffer->ring_capacity == rb_tail % ring_buffer->ring_capacity)) {
+        // Just free the page (drop the packet) if the buffer is full
         free_pages(packet, 1);
       } else {
         ring_buffer->ring_base[ring_index].dma_base = packet;
@@ -92,7 +93,7 @@ void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
 
       // free(packet);
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
-      void* space = alloc_pages(1);
+      void* space = alloc_pages_safe(1);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
       net_driver->rx_tail++;

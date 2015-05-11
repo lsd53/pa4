@@ -178,7 +178,7 @@ void mutex_unlock(int* m) {
 }
 
 int* mallock;
-void *malloc_safe(unsigned int size) {
+void* malloc_safe(unsigned int size) {
   // Mutex lock, call malloc, unlock
   mutex_lock(mallock);
   void* newly_malloced = malloc(size);
@@ -186,7 +186,7 @@ void *malloc_safe(unsigned int size) {
   return newly_malloced;
 }
 
-void *alloc_pages_safe(unsigned int num_pages) {
+void* alloc_pages_safe(unsigned int num_pages) {
   // Mutex lock, call alloc_pages, unlock
   mutex_lock(mallock);
   void* newly_alloced = alloc_pages(num_pages);
@@ -198,6 +198,14 @@ struct ring_buff** ring_buffers;
 struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
+
+int* is_printing;
+void print_stats() {
+  puts("Stats (evil, spammer, vuln):");
+  hashtable_stats(evil_packets);
+  hashtable_stats(spammer_packets);
+  hashtable_stats(vuln_ports);
+}
 
 /* kernel entry point called at the end of the boot sequence */
 void __boot() {
@@ -256,9 +264,9 @@ void __boot() {
     *mallock = 0;
 
     // Init hashtables
-    evil_packets = (struct hashtable*) malloc(sizeof(hashtable));
-    spammer_packets = (struct hashtable*) malloc(sizeof(hashtable));
-    vuln_ports = (struct hashtable*) malloc(sizeof(hashtable));
+    evil_packets = malloc(sizeof(hashtable));
+    spammer_packets = malloc(sizeof(hashtable));
+    vuln_ports = malloc(sizeof(hashtable));
     hashtable_create(evil_packets);
     hashtable_create(spammer_packets);
     hashtable_create(vuln_ports);
@@ -285,7 +293,6 @@ void __boot() {
 
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
-        // puts("got a packet");
 
         // access the buffer at the ring slot and retrieve the packet
         struct ring_slot* ring = (struct ring_slot*) ring_buffer->ring_base;
@@ -321,7 +328,6 @@ void __boot() {
             // Note: Only add the data if it doesn't exist already
             case HONEYPOT_ADD_SPAMMER:
               if (hashtable_get(spammer_packets, little_data) == -1)
-                puts("putting");
                 hashtable_put(spammer_packets, little_data, 0);
               break;
 
@@ -358,7 +364,6 @@ void __boot() {
         // Check if spammer packet
         int spammer_count = hashtable_get(spammer_packets, little_src_addr);
         if (spammer_count != -1) {
-          // puts("spammer");
           // Packet is spammer, increment count
           hashtable_put(spammer_packets, little_src_addr, spammer_count + 1);
         }
@@ -366,7 +371,6 @@ void __boot() {
         // Check if vulnerable port
         int vuln_count = hashtable_get(vuln_ports, (int)little_dest_port);
         if (vuln_count != -1) {
-          // puts("vuln");
           // Packet port is vulnerable, increment count
           hashtable_put(vuln_ports, little_dest_port, vuln_count + 1);
         }
@@ -378,10 +382,7 @@ void __boot() {
     }
   }
 
-  while (1) {
-    hashtable_stats(spammer_packets);
-    busy_wait(1);
-  };
+  while (1);
 
   shutdown();
 }
