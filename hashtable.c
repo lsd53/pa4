@@ -1,5 +1,29 @@
 #include "hashtable.h"
 
+/**
+ * Locks on a memory location
+ */
+void mutex_lock(int* m) {
+  asm __volatile__ (
+    ".set mips2 \n\t"
+    "test_and_set: addiu $8, $0, 1\n\n"
+    "ll $9, 0($4)\n\t"
+    "bnez $9, test_and_set\n\t"
+    "sc $8, 0($4)\n\t"
+    "beqz $8, test_and_set\n\t"
+  );
+}
+
+/**
+ * Unlocks a locked memory location
+ */
+void mutex_unlock(int* m) {
+  asm __volatile__ (
+    ".set mips2 \n\t"
+    "sw $0, 0($4)\n\t"
+  );
+}
+
 /*
  * Append the value x to the end of the arraylist. If necessary, double the
  * capacity of the arraylist.
@@ -77,6 +101,7 @@ void hashtable_create(struct hashtable *self) {
   self->n           = 2;
   self->length      = 0;
   self->num_inserts = 0;
+  self->lock        = (int*) malloc(sizeof(int));
 }
 
 void hashtable_put(struct hashtable *self, int key, int value) {
@@ -84,10 +109,12 @@ void hashtable_put(struct hashtable *self, int key, int value) {
   element->key   = key;
   element->value = value;
 
+  int h = hash(key);
+
+  mutex_lock(self->lock);
+
   self->num_inserts++;
   self->length++;
-
-  int h = hash(key);
 
   if (((double)self->length / (double)self->n) > 0.75) {
     // Have to realloc
@@ -148,10 +175,15 @@ void hashtable_put(struct hashtable *self, int key, int value) {
 
   // Add to bucket if nothing overwritten
   if (!overwrite) arraylist_add(bucket, element);
+
+  mutex_unlock(self->lock);
 }
 
 int hashtable_get(struct hashtable *self, int key) {
   int h = hash(key);
+
+  mutex_lock(self->lock);
+
   int which_bucket = h % self->n;
 
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
@@ -162,16 +194,21 @@ int hashtable_get(struct hashtable *self, int key) {
 
     // Return if keys match
     if (element->key == key) {
+      mutex_unlock(self->lock);
       return element->value;
     }
   }
 
   // Error if nothing returned yet
+  mutex_unlock(self->lock);
   return -1;
 }
 
 void hashtable_remove(struct hashtable *self, int key) {
   int h = hash(key);
+
+  mutex_lock(self->lock);
+
   int which_bucket = h % self->n;
   int removed = 0;
 
@@ -189,6 +226,8 @@ void hashtable_remove(struct hashtable *self, int key) {
       break;
     }
   }
+
+  mutex_unlock(self->lock);
 }
 
 void hashtable_stats(struct hashtable *self) {
