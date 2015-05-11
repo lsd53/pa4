@@ -4,7 +4,7 @@
 
 #define BUFFER_SIZE 4096 // ask about buffer size
 #define CORES_READING 30
-#define CORE_BUFFER_CAP 10
+#define CORE_BUFFER_CAP 4
 
 struct bootparams *bootparams;
 
@@ -153,6 +153,46 @@ void trap_handler(struct mips_core_data *state, unsigned int status, unsigned in
   shutdown();
 }
 
+/**
+ * Locks on a memory location
+ */
+void mutex_lock(int* m) {
+  asm __volatile__ (
+    ".set mips2 \n\t"
+    "test_and_set: addiu $8, $0, 1\n\n"
+    "ll $9, 0($4)\n\t"
+    "bnez $9, test_and_set\n\t"
+    "sc $8, 0($4)\n\t"
+    "beqz $8, test_and_set\n\t"
+  );
+}
+
+/**
+ * Unlocks a locked memory location
+ */
+void mutex_unlock(int* m) {
+  asm __volatile__ (
+    ".set mips2 \n\t"
+    "sw $0, 0($4)\n\t"
+  );
+}
+
+int* mallock;
+void *malloc_safe(unsigned int size) {
+  // Mutex lock, call malloc, unlock
+  mutex_lock(mallock);
+  void* newly_malloced = malloc(size);
+  mutex_unlock(mallock);
+  return newly_malloced;
+}
+
+void *alloc_pages_safe(unsigned int num_pages) {
+  // Mutex lock, call alloc_pages, unlock
+  mutex_lock(mallock);
+  void* newly_alloced = alloc_pages(num_pages);
+  mutex_unlock(mallock);
+  return newly_alloced;
+}
 
 struct ring_buff** ring_buffers;
 struct hashtable* evil_packets;
@@ -211,6 +251,10 @@ void __boot() {
       ring_buffers[i] = new_rb;
     }
 
+    // Initialize int pointer for malloc_safe
+    mallock = malloc(sizeof(int));
+    *mallock = 0;
+
     // Init hashtables
     evil_packets = (struct hashtable*) malloc(sizeof(hashtable));
     spammer_packets = (struct hashtable*) malloc(sizeof(hashtable));
@@ -241,13 +285,26 @@ void __boot() {
 
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
+        // puts("got a packet");
 
         // access the buffer at the ring slot and retrieve the packet
         struct ring_slot* ring = (struct ring_slot*) ring_buffer->ring_base;
         int ring_index = ring_buffer->ring_tail % ring_buffer->ring_capacity;
         void* packet = ring[ring_index].dma_base;
 
+        // Use packet header values so that we can free the page
+        struct honeypot_command_packet* pkt = (struct honeypot_command_packet*) packet;
+        short little_secret = switch_endian_short(pkt->secret_big_endian);
+        int little_src_addr = switch_endian((pkt->headers).ip_source_address_big_endian);
+        short little_dest_port = switch_endian_short((pkt->headers).udp_dest_port_big_endian);
+
+        // Command data
+        short cmd = switch_endian_short(pkt->cmd_big_endian);
+        int little_data = switch_endian(pkt->data_big_endian);
+
         unsigned long packet_hash = djb2((unsigned char*) packet, ring[ring_index].dma_len);
+
+        free_pages(packet, 1);
 
         // Check if evil packet
         int evil_count = hashtable_get(evil_packets, packet_hash);
@@ -256,19 +313,15 @@ void __boot() {
           hashtable_put(evil_packets, packet_hash, evil_count + 1);
         }
 
-        struct honeypot_command_packet* pkt = (struct honeypot_command_packet*) packet;
-
         // Check if command packet
-        short little_secret = switch_endian_short(pkt->secret_big_endian);
         if (little_secret == HONEYPOT_SECRET) {
           // It is a command packet
-          short cmd = switch_endian_short(pkt->cmd_big_endian);
-          int little_data = switch_endian(pkt->data_big_endian);
 
           switch (cmd) {
             // Note: Only add the data if it doesn't exist already
             case HONEYPOT_ADD_SPAMMER:
               if (hashtable_get(spammer_packets, little_data) == -1)
+                puts("putting");
                 hashtable_put(spammer_packets, little_data, 0);
               break;
 
@@ -303,17 +356,17 @@ void __boot() {
         }
 
         // Check if spammer packet
-        int little_src_addr = switch_endian((pkt->headers).ip_source_address_big_endian);
         int spammer_count = hashtable_get(spammer_packets, little_src_addr);
         if (spammer_count != -1) {
+          // puts("spammer");
           // Packet is spammer, increment count
           hashtable_put(spammer_packets, little_src_addr, spammer_count + 1);
         }
 
         // Check if vulnerable port
-        short little_dest_port = switch_endian_short((pkt->headers).udp_dest_port_big_endian);
         int vuln_count = hashtable_get(vuln_ports, (int)little_dest_port);
         if (vuln_count != -1) {
+          // puts("vuln");
           // Packet port is vulnerable, increment count
           hashtable_put(vuln_ports, little_dest_port, vuln_count + 1);
         }
@@ -325,6 +378,10 @@ void __boot() {
     }
   }
 
-  while (1);
+  while (1) {
+    hashtable_stats(spammer_packets);
+    busy_wait(1);
+  };
+
   shutdown();
 }

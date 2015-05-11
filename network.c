@@ -41,7 +41,7 @@ void network_init(int cores_reading){
   }*/
   // allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values
   for (int i = 0; i < RING_SIZE; i++) {
-    void* space = malloc(BUFFER_SIZE);
+    void* space = alloc_pages(1);
     ring[i].dma_base = virtual_to_physical((void *) space);
     ring[i].dma_len = BUFFER_SIZE;
   }
@@ -70,20 +70,37 @@ void network_set_interrupts(int opt){
 void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
   struct dma_ring_slot* ring = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
   while (1) {
-    if ((net_driver->rx_head % net_driver->rx_capacity) == (net_driver->rx_tail % net_driver->rx_capacity)) {
+    // if ((net_driver->rx_head % net_driver->rx_capacity) == (net_driver->rx_tail % net_driver->rx_capacity)) {
+    if (net_driver->rx_head != net_driver->rx_tail) {
       int index = net_driver->rx_tail % cores_reading;
+      struct ring_buff* ring_buffer = ring_buffers[index];
+
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
-      int ring_index = ring_buffers[index]->ring_head % ring_buffers[index]->ring_capacity;
-      ring_buffers[index]->ring_base[ring_index].dma_base = packet;
-      ring_buffers[index]->ring_head++;
+      int ring_index = ring_buffer->ring_head % ring_buffer->ring_capacity;
 
-      free(packet);
+      // Do nothing if ring buffer full (drop packet)
+      int rb_head = ring_buffer->ring_head;
+      int rb_tail = ring_buffer->ring_tail;
+
+      if (rb_head != rb_tail && (rb_head % ring_buffer->ring_capacity == rb_tail % ring_buffer->ring_capacity)) {
+        free_pages(packet, 1);
+      } else {
+        ring_buffer->ring_base[ring_index].dma_base = packet;
+        ring_buffer->ring_head++;
+      }
+
+      // free(packet);
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
-      void* space = malloc(BUFFER_SIZE);
+      void* space = alloc_pages(1);
       ring[net_driver->rx_tail % RING_SIZE].dma_base = virtual_to_physical(space);
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
       net_driver->rx_tail++;
+
+
+      // reallocate memory for ring buffer when done with packet, reset length and update the tail
+      // ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
+      // net_driver->rx_tail++;
     }
   }
 }

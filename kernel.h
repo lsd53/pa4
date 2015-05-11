@@ -134,6 +134,12 @@ void *malloc(unsigned int size); // allocate size bytes of memory
 void *calloc(unsigned int size, unsigned int count); // allocate and clear (size * count) bytes of memory
 void free(void *p); // free a pointer that came from malloc() or calloc()
 
+void mutex_lock(int* m);
+void mutex_unlock(int* m);
+
+// Mallocs safely by waiting for mutex lock
+void *malloc_safe(unsigned int size);
+void *alloc_pages_safe(unsigned int size);
 
 /* printf.c */
 

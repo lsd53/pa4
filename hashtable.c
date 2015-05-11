@@ -1,29 +1,5 @@
 #include "hashtable.h"
 
-/**
- * Locks on a memory location
- */
-void mutex_lock(int* m) {
-  asm __volatile__ (
-    ".set mips2 \n\t"
-    "test_and_set: addiu $8, $0, 1\n\n"
-    "ll $9, 0($4)\n\t"
-    "bnez $9, test_and_set\n\t"
-    "sc $8, 0($4)\n\t"
-    "beqz $8, test_and_set\n\t"
-  );
-}
-
-/**
- * Unlocks a locked memory location
- */
-void mutex_unlock(int* m) {
-  asm __volatile__ (
-    ".set mips2 \n\t"
-    "sw $0, 0($4)\n\t"
-  );
-}
-
 /*
  * Append the value x to the end of the arraylist. If necessary, double the
  * capacity of the arraylist.
@@ -33,9 +9,9 @@ void arraylist_add(arraylist* a, void* x) {
     // Need to realloc
     a->buffer_size *= 2;
 
-    // Malloc new space, copy elements, free old space
+    // Malloc_safe new space, copy elements, free old space
     void** old_space = a->buffer;
-    a->buffer = (void**) malloc(sizeof(void*) * a->buffer_size);
+    a->buffer = (void**) malloc_safe(sizeof(void*) * a->buffer_size);
     memcpy(a->buffer, old_space, sizeof(void*) * a->length);
 
     free(old_space);
@@ -49,8 +25,8 @@ void arraylist_add(arraylist* a, void* x) {
  * Create a new arraylist
  */
 arraylist* arraylist_new() {
-  arraylist* a = (arraylist*)malloc(sizeof(arraylist));
-  a->buffer = (void**)malloc(2 * sizeof(void*));
+  arraylist* a = (arraylist*)malloc_safe(sizeof(arraylist));
+  a->buffer = malloc_safe(2 * sizeof(void*));
   a->buffer_size = 2;
   a->length = 0;
 
@@ -61,7 +37,7 @@ arraylist* arraylist_new() {
  * Free any memory used by that arraylist.
  */
 void arraylist_free(arraylist* a) {
-  // Hint: How many times is malloc called when creating a new arraylist?
+  // Hint: How many times is malloc_safe called when creating a new arraylist?
   free(a->buffer);
   free(a);
 }
@@ -97,13 +73,12 @@ void hashtable_create(struct hashtable *self) {
   self->n           = 2;
   self->length      = 0;
   self->num_inserts = 0;
-  self->lock        = (int*) malloc(sizeof(int));
+  self->lock        = (int*) malloc_safe(sizeof(int));
   *(self->lock)     = 0;
 }
 
 void hashtable_put(struct hashtable *self, int key, int value) {
-  // hashtable_stats(self);
-  pair* element  = (pair*)malloc(sizeof(pair));
+  pair* element  = (pair*)malloc_safe(sizeof(pair));
   element->key   = key;
   element->value = value;
 
@@ -111,8 +86,8 @@ void hashtable_put(struct hashtable *self, int key, int value) {
 
   mutex_lock(self->lock);
 
-  self->num_inserts++;
   self->length++;
+  self->num_inserts++;
 
   if (((double)self->length / (double)self->n) > 0.75) {
     // Have to realloc
@@ -208,7 +183,6 @@ void hashtable_remove(struct hashtable *self, int key) {
   mutex_lock(self->lock);
 
   int which_bucket = h % self->n;
-  int removed = 0;
 
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
 
@@ -220,7 +194,6 @@ void hashtable_remove(struct hashtable *self, int key) {
     if (element->key == key) {
       arraylist_remove(bucket, i);
       self->length--;
-      removed = 1;
       break;
     }
   }
@@ -229,6 +202,7 @@ void hashtable_remove(struct hashtable *self, int key) {
 }
 
 void hashtable_stats(struct hashtable *self) {
-  // puts("hello");
+  mutex_lock(self->lock);
   printf("length = %d, N = %d, puts = %d\n", self->length, self->n, self->num_inserts);
+  mutex_unlock(self->lock);
 }
