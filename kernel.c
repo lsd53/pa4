@@ -3,7 +3,8 @@
 #include "hashtable.h"
 
 #define BUFFER_SIZE 4096 // ask about buffer size
-#define CORES_READING 28
+#define CORES_READING 30
+#define CORE_BUFFER_CAP 10
 
 struct bootparams *bootparams;
 
@@ -153,7 +154,7 @@ void trap_handler(struct mips_core_data *state, unsigned int status, unsigned in
 }
 
 
-struct ring_buff* ring_buffer;
+struct ring_buff** ring_buffers;
 struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
@@ -187,24 +188,27 @@ void __boot() {
     for (int i = 0; i < 32; i++)
       printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
 
-    // see which cores got turned on
-    busy_wait(0.4);
-    for (int i = 0; i < 32; i++)
-      printf("CPU[%d] is %s\n", i, (current_cpu_enable() & (1<<i)) ? "on" : "off");
-
 
     // allocate room for ring buffers that are to be used for additional queueing
-    ring_buffer = (struct ring_buff*) malloc(sizeof(struct ring_buff));
+    ring_buffers = malloc(sizeof(struct ring_buff*) * CORES_READING);
 
-    // initiaze correct values for ring buffers allocated
-    ring_buffer->ring_capacity = 30;
-    ring_buffer->ring_head = 0;
-    ring_buffer->ring_tail = 0;
-    ring_buffer->ring_base = (struct ring_slot*) malloc(sizeof(struct ring_slot)*ring_buffer->ring_capacity);
+    int i;
+    for (i = 0; i < CORES_READING; i++) {
+      struct ring_buff* new_rb = malloc(sizeof(struct ring_buff));
 
-    for (int i= 0; i < ring_buffer->ring_capacity; i++) {
-      ring_buffer->ring_base[i].dma_base = malloc(BUFFER_SIZE);
-      ring_buffer->ring_base[i].dma_len = BUFFER_SIZE;
+      // initialize correct values for ring buffers allocated
+      new_rb->ring_capacity = CORE_BUFFER_CAP;
+      new_rb->ring_head = 0;
+      new_rb->ring_tail = 0;
+      new_rb->ring_base = (struct ring_slot*) malloc(sizeof(struct ring_slot) * CORE_BUFFER_CAP);
+
+      int j;
+      for (j= 0; j < CORE_BUFFER_CAP; j++) {
+        new_rb->ring_base[j].dma_base = malloc(BUFFER_SIZE);
+        new_rb->ring_base[j].dma_len = BUFFER_SIZE;
+      }
+
+      ring_buffers[i] = new_rb;
     }
 
     // Init hashtables
@@ -215,19 +219,26 @@ void __boot() {
     hashtable_create(spammer_packets);
     hashtable_create(vuln_ports);
 
-    // turn on all other cores
-    set_cpu_enable(0xFFFFFFFF);
-
     //initiliaze network driver and polling
     network_init(CORES_READING);
     network_start_receive();
-    network_poll(ring_buffer);
+
+    // turn on core 1
+    set_cpu_enable(1 << 1);
+
+  } else if (current_cpu_id() == 1) {
+    // Core 1 polls the network
+    set_cpu_enable(0xFFFFFFFF);
+    network_poll(ring_buffers, CORES_READING);
 
   } else {
 
     /**
      * The remaining cores analyze packets
      */
+    int me = current_cpu_id() - (32 - CORES_READING);
+    struct ring_buff* ring_buffer = ring_buffers[me];
+
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
         // access the buffer at the ring slot and retrieve the packet
@@ -313,10 +324,6 @@ void __boot() {
     }
   }
 
-  while (1) {
-    printf("Core %d is still running...\n", current_cpu_id());
-    busy_wait(4.0); // wait 4 seconds
-  }
-
+  while (1);
   shutdown();
 }

@@ -67,14 +67,17 @@ void network_set_interrupts(int opt){
 }
 
 
-void network_poll(struct ring_buff* ring_buffer){
-  struct dma_ring_slot* ring= (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
-  while(1){
+void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
+  int which_core = 0;
+  struct dma_ring_slot* ring = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base); 
+  while (1) {
     if ((net_driver->rx_head % net_driver->rx_capacity) == (net_driver->rx_tail % net_driver->rx_capacity)) {
+      int index = which_core % cores_reading;
       // access the buffer at the ring slot and retrieve the packet
       void* packet = physical_to_virtual(ring[net_driver->rx_tail % RING_SIZE].dma_base);
-      ring_buffer->ring_base[ring_buffer->ring_head % ring_buffer->ring_capacity].dma_base = packet;
-      ring_buffer->ring_head+=1;   
+      int ring_index = ring_buffers[index]->ring_head % ring_buffers[index]->ring_capacity;
+      (ring_buffers[index]->ring_base[ring_index]).dma_base = packet;
+      ring_buffers[index]->ring_head++;
  
       free(packet);
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
@@ -83,7 +86,8 @@ void network_poll(struct ring_buff* ring_buffer){
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE; 
       net_driver->rx_tail+=1;  
 
-      
+      which_core++;
+
       // puts("Received packet");
     }
   }
