@@ -98,7 +98,6 @@ void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
       ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
       net_driver->rx_tail++;
 
-
       // reallocate memory for ring buffer when done with packet, reset length and update the tail
       // ring[net_driver->rx_tail % RING_SIZE].dma_len = BUFFER_SIZE;
       // net_driver->rx_tail++;

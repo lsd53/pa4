@@ -4,11 +4,11 @@
 
 #define BUFFER_SIZE 4096 // ask about buffer size
 #define CORES_READING 30
-#define CORE_BUFFER_CAP 4
+#define CORE_BUFFER_CAP 8
 
 struct bootparams *bootparams;
 
-int debug = 1; // change to 0 to stop seeing so many messages
+int debug = 0; // change to 0 to stop seeing so many messages
 
 void shutdown() {
   puts("Shutting down...");
@@ -202,13 +202,13 @@ struct hashtable* vuln_ports;
 int* is_printing;
 void print_stats() {
   puts("Spammer stats");
-  hashtable_stats(spammer_packets);
+  hashtable_stats(spammer_packets, "source address");
 
   puts("Evil stats");
-  hashtable_stats(evil_packets);
+  hashtable_stats(evil_packets, "hash");
 
   puts("Vulnerable stats");
-  hashtable_stats(vuln_ports);
+  hashtable_stats(vuln_ports, "dest port");
 }
 
 /* kernel entry point called at the end of the boot sequence */

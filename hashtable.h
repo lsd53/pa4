@@ -47,4 +47,4 @@ int hashtable_get(struct hashtable *self, int key);
 
 void hashtable_remove(struct hashtable *self, int key);
 
-void hashtable_stats(struct hashtable *self);
+void hashtable_stats(struct hashtable *self, char* name);

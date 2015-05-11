@@ -199,19 +199,28 @@ void hashtable_remove(struct hashtable *self, int key) {
   mutex_unlock(self->lock);
 }
 
-void hashtable_stats(struct hashtable *self) {
+void hashtable_stats(struct hashtable *self, char* name) {
   mutex_lock(self->lock);
+
+  printf("\toccurrences\t%s\n", name);
+  unsigned int total_occ = 0;
+  unsigned int records   = 0;
 
   unsigned int b;
   unsigned int e;
-  puts("\thash\toccurrences");
   for (b = 0; b < self->n; b++) {
     arraylist* bucket = arraylist_get(self->buckets, b);
     for (e = 0; e < bucket->length; e++) {
       pair* tuple = arraylist_get(bucket, e);
-      printf("\t0x%x\t%d\n", tuple->key, tuple->value);
+      printf("\t%d\t\t0x%x\n", tuple->value, tuple->key);
+
+      total_occ += tuple->value;
+      records++;
     }
   }
+  printf("total count:\t%d\n", total_occ);
+  printf("entries:\t%d\n", records);
+  puts("");
 
   mutex_unlock(self->lock);
 }
