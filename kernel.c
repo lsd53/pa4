@@ -201,6 +201,9 @@ struct hashtable* vuln_ports;
 
 int* is_printing;
 void print_stats() {
+  mutex_lock(is_printing);
+
+  // Hashtable stats
   puts("Spammer stats");
   hashtable_stats(spammer_packets, "source address");
 
@@ -209,6 +212,20 @@ void print_stats() {
 
   puts("Vulnerable stats");
   hashtable_stats(vuln_ports, "dest port");
+
+  // Dropped packet stats
+  unsigned int dropped = get_dropped_packets();
+  double pkt_drop_rate = dropped * current_cpu_cycles() / (double)CPU_CYCLES_PER_SECOND;
+  printf("Dropped packets:\t%d (%f pkts/s)\n", dropped, pkt_drop_rate);
+
+  unsigned int r_pkts = get_received_packets();
+  double pkt_rec_rate = r_pkts * current_cpu_cycles() / (double)CPU_CYCLES_PER_SECOND;
+  printf("Received packets:\t%d (%f pkts/s)\n", r_pkts, pkt_rec_rate);
+
+  // unsigned int received_bytes = get_received_packets();
+  // printf("Bytes received:\t%d\n", received_bytes);
+
+  mutex_unlock(is_printing);
 }
 
 /* kernel entry point called at the end of the boot sequence */

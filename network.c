@@ -13,6 +13,9 @@ volatile struct dev_net *net_driver;
 
 volatile struct ring_buff *ring_buffer;
 
+unsigned int freed_packets = 0;
+unsigned int received_packets = 0;
+
 void network_init(int cores_reading){
   /* Find virtual address of I/0 region for network driver */
   for (int i=0; i < 16; i++){
@@ -86,8 +89,36 @@ void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
       if (rb_head != rb_tail && (rb_head % ring_buffer->ring_capacity == rb_tail % ring_buffer->ring_capacity)) {
         // Just free the page (drop the packet) if the buffer is full
         free_pages(packet, 1);
+        freed_packets++;
+
       } else {
+        // Add pointer to packet to specific core ring buffer
+        received_packets++;
         ring_buffer->ring_base[ring_index].dma_base = packet;
+
+
+
+
+
+
+
+
+
+
+
+// Set dma_len here??
+
+
+
+
+
+
+
+
+
+
+
+
         ring_buffer->ring_head++;
       }
 
@@ -105,7 +136,14 @@ void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
   }
 }
 
-
-void network_trap(){
-
+// Getter methods for global stats
+unsigned int get_dropped_packets() {
+  net_driver->cmd = NET_GET_DROPCOUNT;
+  return net_driver->data + freed_packets;
 }
+
+unsigned int get_received_packets() {
+  return received_packets;
+}
+
+void network_trap() {}

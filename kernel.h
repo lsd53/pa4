@@ -143,6 +143,8 @@ void *alloc_pages_safe(unsigned int size);
 
 // Prints stats about the honeypot
 void print_stats();
+unsigned int get_dropped_packets();
+unsigned int get_received_packets();
 
 /* printf.c */
 
