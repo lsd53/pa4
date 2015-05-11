@@ -199,6 +199,18 @@ struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
 
+int* is_printing;
+void print_stats() {
+  puts("Spammer stats");
+  hashtable_stats(spammer_packets);
+
+  puts("Evil stats");
+  hashtable_stats(evil_packets);
+
+  puts("Vulnerable stats");
+  hashtable_stats(vuln_ports);
+}
+
 /* kernel entry point called at the end of the boot sequence */
 void __boot() {
 
@@ -254,6 +266,10 @@ void __boot() {
     // Initialize int pointer for malloc_safe
     mallock = malloc(sizeof(int));
     *mallock = 0;
+
+    // Initialize int pointer for printing
+    is_printing = malloc(sizeof(int));
+    *is_printing = 0;
 
     // Init hashtables
     evil_packets = malloc(sizeof(hashtable));
@@ -347,7 +363,7 @@ void __boot() {
 
             case HONEYPOT_PRINT:
               // Print statistics
-
+              print_stats();
               break;
           }
 

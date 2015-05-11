@@ -27,6 +27,10 @@ void keyboard_trap() {
   while (dev_kbd->status) {
     // read the character
     char c = dev_kbd->data;
-    putchar(c);
+    if (c == ' ') {
+      puts("printing stats now");
+      // Print some stats bbe
+      print_stats();
+    }
   }
 }
