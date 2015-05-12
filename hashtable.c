@@ -1,5 +1,7 @@
 #include "hashtable.h"
 
+#define STARTING_SIZE 32
+
 /*
  * Append the value x to the end of the arraylist. If necessary, double the
  * capacity of the arraylist.
@@ -26,8 +28,8 @@ void arraylist_add(arraylist* a, void* x) {
  */
 arraylist* arraylist_new() {
   arraylist* a = (arraylist*)malloc_safe(sizeof(arraylist));
-  a->buffer = malloc_safe(2 * sizeof(void*));
-  a->buffer_size = 2;
+  a->buffer = malloc_safe(STARTING_SIZE * sizeof(void*));
+  a->buffer_size = STARTING_SIZE;
   a->length = 0;
 
   return a;
@@ -67,14 +69,16 @@ unsigned int hash(unsigned int a) {
 void hashtable_create(struct hashtable *self) {
   // Add 2 buckets initially
   self->buckets = arraylist_new();
-  arraylist_add(self->buckets, arraylist_new());
-  arraylist_add(self->buckets, arraylist_new());
-
-  self->n           = 2;
+  self->n           = STARTING_SIZE;
   self->length      = 0;
   self->num_inserts = 0;
   self->lock        = (int*) malloc_safe(sizeof(int));
   *(self->lock)     = 0;
+
+  unsigned int i;
+  for (i = 0; i < self->n; i++) {
+    arraylist_add(self->buckets, arraylist_new());
+  }
 }
 
 void hashtable_put(struct hashtable *self, int key, int value) {

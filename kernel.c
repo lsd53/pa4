@@ -215,15 +215,16 @@ void print_stats() {
 
   // Dropped packet stats
   unsigned int dropped = get_dropped_packets();
-  double pkt_drop_rate = dropped * current_cpu_cycles() / (double)CPU_CYCLES_PER_SECOND;
+  double pkt_drop_rate = dropped * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles();
   printf("Dropped packets:\t%d (%f pkts/s)\n", dropped, pkt_drop_rate);
 
-  unsigned int r_pkts = get_received_packets();
-  double pkt_rec_rate = r_pkts * current_cpu_cycles() / (double)CPU_CYCLES_PER_SECOND;
-  printf("Received packets:\t%d (%f pkts/s)\n", r_pkts, pkt_rec_rate);
+  // Received packet stats
+  unsigned int r_pkts  = get_received_packets();
+  double pkt_rec_rate  = r_pkts * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles();
+  double byte_rec_rate = get_received_bytes() * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles() / (1024 * 1024) * 8;
+  printf("Received packets:\t%d (%f pkts/s, %f Mbit/s)\n", r_pkts, pkt_rec_rate, byte_rec_rate);
 
-  // unsigned int received_bytes = get_received_packets();
-  // printf("Bytes received:\t%d\n", received_bytes);
+  puts("");
 
   mutex_unlock(is_printing);
 }
@@ -310,9 +311,7 @@ void __boot() {
 
   } else {
 
-    /**
-     * The remaining cores analyze packets
-     */
+    // The remaining cores analyze packets
     int me = current_cpu_id() - (32 - CORES_READING);
     struct ring_buff* ring_buffer = ring_buffers[me];
 
