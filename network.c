@@ -57,7 +57,7 @@ void network_start_receive() {
 
 void network_set_interrupts(int opt) {}
 
-void network_poll(struct ring_buff** queues, int cores_reading) {
+void network_poll(struct ring_buff** queues, int cores_reading, struct ring_buff* unused_pages) {
   int which_core = 0;
   struct dma_ring_slot* net_driver_slot = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
   while (1) {
@@ -90,8 +90,12 @@ void network_poll(struct ring_buff** queues, int cores_reading) {
         q->ring_head++;
 
         // reallocate memory for ring buffer when done with packet, reset length and update the tail
-        void* space = alloc_pages_safe(1);
-        net_driver_slot[which_packet].dma_base = virtual_to_physical(space);
+        // get new page for network ring buffer when done with packet
+        int up_index = unused_pages->ring_tail % unused_pages->ring_capacity;
+        void* new_space = unused_pages->ring_base[up_index].dma_base;
+        unused_pages->ring_tail++;
+
+        net_driver_slot[which_packet].dma_base = virtual_to_physical(new_space);
         net_driver_slot[which_packet].dma_len = BUFFER_SIZE;
         net_driver->rx_tail++;
       }

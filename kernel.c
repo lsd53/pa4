@@ -199,6 +199,10 @@ struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
 
+// Buffer to hold allocated but unused pages
+int* up_lock;
+struct ring_buff* unused_pages;
+
 int* is_printing;
 void print_stats() {
   mutex_lock(is_printing);
@@ -275,11 +279,28 @@ void __boot() {
       int j;
       for (j= 0; j < CORE_BUFFER_CAP; j++) {
         new_rb->ring_base[j].dma_base = malloc(BUFFER_SIZE);
-        new_rb->ring_base[j].dma_len = BUFFER_SIZE;
+        new_rb->ring_base[j].dma_len  = BUFFER_SIZE;
       }
 
       queues[i] = new_rb;
     }
+
+    // Initialize buffer for unused pages
+    unused_pages = malloc(sizeof(struct ring_buff));
+
+    unused_pages->ring_capacity = CORE_BUFFER_CAP * CORES_READING;
+    unused_pages->ring_head = 0;
+    unused_pages->ring_tail = 0;
+    unused_pages->ring_base = (struct ring_slot*) malloc(sizeof(struct ring_slot) * CORE_BUFFER_CAP * CORES_READING);
+
+    // Allocate one page for each ring slot in the buffer
+    unsigned int k;
+    for (k = 0; k < CORES_READING * CORE_BUFFER_CAP; k++) {
+      unused_pages->ring_base[k].dma_base = alloc_pages(1);
+    }
+
+    up_lock = malloc(sizeof(int));
+    *up_lock = 0;
 
     // Initialize int pointer for malloc_safe
     mallock = malloc(sizeof(int));
@@ -307,7 +328,7 @@ void __boot() {
   } else if (current_cpu_id() == 1) {
     // Core 1 polls the network
     set_cpu_enable(0xFFFFFFFF);
-    network_poll(queues, CORES_READING);
+    network_poll(queues, CORES_READING, unused_pages);
 
   } else {
 
@@ -335,7 +356,12 @@ void __boot() {
 
         unsigned long packet_hash = djb2((unsigned char*) packet, ring[ring_index].dma_len);
 
-        free_pages(packet, 1);
+        // Add this page to the unused_pages buffer
+        mutex_lock(up_lock);
+        int up_push_idx = unused_pages->ring_head % unused_pages->ring_capacity;
+        unused_pages->ring_base[up_push_idx].dma_base = packet;
+        unused_pages->ring_head++;
+        mutex_unlock(up_lock);
 
         // Check if command packet
         if (little_secret == HONEYPOT_SECRET) {
