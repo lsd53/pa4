@@ -1,7 +1,5 @@
 #include "hashtable.h"
 
-#define STARTING_SIZE 32
-
 /*
  * Append the value x to the end of the arraylist. If necessary, double the
  * capacity of the arraylist.
@@ -166,7 +164,6 @@ void hashtable_put_safe(struct hashtable *self, int key, int value) {
 
   // Return early if hash already exists
   int which_bucket = h % self->n;
-
   arraylist* bucket = arraylist_get(self->buckets, which_bucket);
 
   unsigned int c;

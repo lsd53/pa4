@@ -1,5 +1,7 @@
 #include "kernel.h"
 
+#define STARTING_SIZE 32
+
 typedef struct arraylist {
   void** buffer;            // pointer to allocated memory
   unsigned int buffer_size; // the max number of elements the buffer can hold
@@ -39,7 +41,7 @@ typedef struct pair {
   signed int value;
 } pair;
 
-// Returns a new empty hashtable
+// Returns a new empty hashtable of size STARTING_SIZE
 void hashtable_create(struct hashtable *self);
 
 // Puts a data value in the hashtable, resizing if necessary
