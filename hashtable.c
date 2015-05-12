@@ -280,7 +280,6 @@ void hashtable_increment(struct hashtable *self, int key) {
 
   // Error if nothing returned yet
   mutex_unlock(self->lock);
-  return;
 }
 
 void hashtable_remove(struct hashtable *self, int key) {
@@ -300,6 +299,7 @@ void hashtable_remove(struct hashtable *self, int key) {
     if (element->key == key) {
       arraylist_remove(bucket, i);
       self->length--;
+      mutex_unlock(self->lock);
       return;
     }
   }

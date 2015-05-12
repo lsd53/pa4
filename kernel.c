@@ -337,17 +337,10 @@ void __boot() {
 
         free_pages(packet, 1);
 
-        // Check if evil packet
-        int evil_count = hashtable_get(evil_packets, packet_hash);
-        if (evil_count != -1) {
-          // Packet is evil
-          hashtable_put(evil_packets, packet_hash, evil_count + 1);
-        }
-
         // Check if command packet
         if (little_secret == HONEYPOT_SECRET) {
-          // It is a command packet
 
+          // It is a command packet
           switch (cmd) {
             // Note: Only add the data if it doesn't exist already
             case HONEYPOT_ADD_SPAMMER:
@@ -382,10 +375,9 @@ void __boot() {
 
         }
 
-        // Check if spammer packet
+        // Increment if packet
+        hashtable_increment(evil_packets, packet_hash);
         hashtable_increment(spammer_packets, little_src_addr);
-
-        // Check if vulnerable port
         hashtable_increment(vuln_ports, (int)little_dest_port);
 
         // Increment head since packet was read
