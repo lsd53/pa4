@@ -11,9 +11,6 @@
 // pointer to memory-mapped I/0 region for network driver
 volatile struct dev_net *net_driver;
 
-volatile struct ring_buff *ring_buffer;
-
-unsigned int freed_packets = 0;
 unsigned int received_packets = 0;
 unsigned int received_bytes = 0;
 
@@ -32,6 +29,8 @@ void network_init(int cores_reading){
   struct dma_ring_slot* ring=(struct dma_ring_slot*) malloc(sizeof(struct dma_ring_slot) * RING_SIZE);
   net_driver->rx_base =  virtual_to_physical((void *) ring); //ASK ABOUT THIS PART
   net_driver->rx_capacity = RING_SIZE;
+  net_driver->rx_head = 0;
+  net_driver->rx_tail = 0;
 
   // allocate room for each buffer in the ring and set dma_base and dma_len to appropriate values
   for (int i = 0; i < RING_SIZE; i++) {
@@ -58,41 +57,42 @@ void network_start_receive() {
 
 void network_set_interrupts(int opt) {}
 
-void network_poll(struct ring_buff** ring_buffers, int cores_reading) {
+void network_poll(struct ring_buff** queues, int cores_reading) {
   int which_core = 0;
-  struct dma_ring_slot* ring = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
+  struct dma_ring_slot* net_driver_slot = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
   while (1) {
     if (net_driver->rx_head != net_driver->rx_tail) {
 
-      int index = which_core % cores_reading;
+      struct ring_buff* q = queues[which_core % cores_reading];
       which_core++;
-      struct ring_buff* ring_buffer = ring_buffers[index];
 
       // Do nothing if ring buffer full (drop packet)
-      int rb_head = ring_buffer->ring_head;
-      int rb_tail = ring_buffer->ring_tail;
+      int q_head = q->ring_head;
+      int q_tail = q->ring_tail;
 
       // Ignore the packet if this buffer is full
-      if (rb_head == rb_tail || (rb_head % ring_buffer->ring_capacity != rb_tail % ring_buffer->ring_capacity)) {
+      if (q_head == q_tail || (q_head % q->ring_capacity != q_tail % q->ring_capacity)) {
 
         // Get indices for use later
-        int ring_base_index = ring_buffer->ring_head % ring_buffer->ring_capacity;
-        int ring_index = net_driver->rx_tail % RING_SIZE;
+        int q_push_idx = q->ring_head % q->ring_capacity;
+        int which_packet = net_driver->rx_tail % RING_SIZE;
 
         // access the buffer at the ring slot and retrieve the packet
-        void* packet = physical_to_virtual(ring[ring_index].dma_base);
+        void* packet = physical_to_virtual(net_driver_slot[which_packet].dma_base);
+
+        // For global stats
+        received_packets++;
+        received_bytes += net_driver_slot[which_packet].dma_len;
 
         // Add pointer to packet to specific core ring buffer
-        received_packets++;
-        received_bytes += ring[ring_index].dma_len;
-        ring_buffer->ring_base[ring_base_index].dma_base = packet;
-        ring_buffer->ring_base[ring_base_index].dma_len = ring[ring_index].dma_len;
-        ring_buffer->ring_head++;
+        q->ring_base[q_push_idx].dma_base = packet;
+        q->ring_base[q_push_idx].dma_len = net_driver_slot[which_packet].dma_len;
+        q->ring_head++;
 
         // reallocate memory for ring buffer when done with packet, reset length and update the tail
         void* space = alloc_pages_safe(1);
-        ring[ring_index].dma_base = virtual_to_physical(space);
-        ring[ring_index].dma_len = BUFFER_SIZE;
+        net_driver_slot[which_packet].dma_base = virtual_to_physical(space);
+        net_driver_slot[which_packet].dma_len = BUFFER_SIZE;
         net_driver->rx_tail++;
       }
     }

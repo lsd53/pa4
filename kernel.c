@@ -194,7 +194,7 @@ void* alloc_pages_safe(unsigned int num_pages) {
   return newly_alloced;
 }
 
-struct ring_buff** ring_buffers;
+struct ring_buff** queues;
 struct hashtable* evil_packets;
 struct hashtable* spammer_packets;
 struct hashtable* vuln_ports;
@@ -260,9 +260,9 @@ void __boot() {
 
 
     // allocate room for ring buffers that are to be used for additional queueing
-    ring_buffers = malloc(sizeof(struct ring_buff*) * CORES_READING);
+    queues = malloc(sizeof(struct ring_buff*) * CORES_READING);
 
-    int i;
+    unsigned int i;
     for (i = 0; i < CORES_READING; i++) {
       struct ring_buff* new_rb = malloc(sizeof(struct ring_buff));
 
@@ -278,7 +278,7 @@ void __boot() {
         new_rb->ring_base[j].dma_len = BUFFER_SIZE;
       }
 
-      ring_buffers[i] = new_rb;
+      queues[i] = new_rb;
     }
 
     // Initialize int pointer for malloc_safe
@@ -307,13 +307,13 @@ void __boot() {
   } else if (current_cpu_id() == 1) {
     // Core 1 polls the network
     set_cpu_enable(0xFFFFFFFF);
-    network_poll(ring_buffers, CORES_READING);
+    network_poll(queues, CORES_READING);
 
   } else {
 
     // The remaining cores analyze packets
     int me = current_cpu_id() - (32 - CORES_READING);
-    struct ring_buff* ring_buffer = ring_buffers[me];
+    struct ring_buff* ring_buffer = queues[me];
 
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
