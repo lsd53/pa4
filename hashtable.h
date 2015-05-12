@@ -39,12 +39,24 @@ typedef struct pair {
   signed int value;
 } pair;
 
+// Returns a new empty hashtable
 void hashtable_create(struct hashtable *self);
 
+// Puts a data value in the hashtable, resizing if necessary
 void hashtable_put(struct hashtable *self, int key, int value);
 
+// Puts a data value in the hashtable only if it is not already there
+// Resizes if necessary
+void hashtable_put_safe(struct hashtable *self, int key, int value);
+
+// Returns a value from the hashtable with matching key or -1
 int hashtable_get(struct hashtable *self, int key);
 
+// Increments the value with matching key, or does nothing if key not found
+void hashtable_increment(struct hashtable *self, int key);
+
+// Removes a key-value pair from the hashtable
 void hashtable_remove(struct hashtable *self, int key);
 
+// Prints stats about the hashtable, including key-value pairs
 void hashtable_stats(struct hashtable *self, char* name);

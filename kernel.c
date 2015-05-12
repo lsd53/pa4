@@ -351,18 +351,15 @@ void __boot() {
           switch (cmd) {
             // Note: Only add the data if it doesn't exist already
             case HONEYPOT_ADD_SPAMMER:
-              if (hashtable_get(spammer_packets, little_data) == -1)
-                hashtable_put(spammer_packets, little_data, 0);
+              hashtable_put_safe(spammer_packets, little_data, 0);
               break;
 
             case HONEYPOT_ADD_EVIL:
-              if (hashtable_get(evil_packets, little_data) == -1)
-                hashtable_put(evil_packets, little_data, 0);
+              hashtable_put_safe(evil_packets, little_data, 0);
               break;
 
             case HONEYPOT_ADD_VULNERABLE:
-              if (hashtable_get(vuln_ports, little_data) == -1)
-                hashtable_put(vuln_ports, little_data, 0);
+              hashtable_put_safe(vuln_ports, little_data, 0);
               break;
 
             case HONEYPOT_DEL_SPAMMER:
@@ -386,18 +383,10 @@ void __boot() {
         }
 
         // Check if spammer packet
-        int spammer_count = hashtable_get(spammer_packets, little_src_addr);
-        if (spammer_count != -1) {
-          // Packet is spammer, increment count
-          hashtable_put(spammer_packets, little_src_addr, spammer_count + 1);
-        }
+        hashtable_increment(spammer_packets, little_src_addr);
 
         // Check if vulnerable port
-        int vuln_count = hashtable_get(vuln_ports, (int)little_dest_port);
-        if (vuln_count != -1) {
-          // Packet port is vulnerable, increment count
-          hashtable_put(vuln_ports, little_dest_port, vuln_count + 1);
-        }
+        hashtable_increment(vuln_ports, (int)little_dest_port);
 
         // Increment head since packet was read
         ring[ring_index].dma_len = PAGE_SIZE;
