@@ -201,7 +201,7 @@ struct hashtable* vuln_ports;
 
 // Buffer to hold allocated but unused pages
 int* up_lock;
-struct ring_buff* unused_pages;
+struct page_buff* unused_pages;
 
 int* is_printing;
 void print_stats() {
@@ -288,17 +288,17 @@ void __boot() {
     }
 
     // Initialize buffer for unused pages
-    unused_pages = malloc(sizeof(struct ring_buff));
+    unused_pages = malloc(sizeof(struct page_buff));
 
     unused_pages->ring_capacity = CORE_BUFFER_CAP * CORES_READING;
     unused_pages->ring_head = 0;
     unused_pages->ring_tail = 0;
-    unused_pages->ring_base = (struct ring_slot*) malloc(sizeof(struct ring_slot) * CORE_BUFFER_CAP * CORES_READING);
+    unused_pages->pages = (void*) malloc(sizeof(void*) * CORE_BUFFER_CAP * CORES_READING);
 
     // Allocate one page for each ring slot in the buffer
     unsigned int k;
     for (k = 0; k < CORES_READING * CORE_BUFFER_CAP; k++) {
-      unused_pages->ring_base[k].dma_base = alloc_pages(1);
+      unused_pages->pages[k] = alloc_pages(1);
     }
 
     up_lock = malloc(sizeof(int));
@@ -361,7 +361,7 @@ void __boot() {
         // Add this page to the unused_pages buffer
         mutex_lock(up_lock);
         int up_push_idx = unused_pages->ring_head % unused_pages->ring_capacity;
-        unused_pages->ring_base[up_push_idx].dma_base = packet;
+        unused_pages->pages[up_push_idx] = packet;
         unused_pages->ring_head++;
         mutex_unlock(up_lock);
 

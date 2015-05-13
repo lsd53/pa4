@@ -11,3 +11,10 @@ typedef struct ring_buff {
   unsigned int ring_head;
   unsigned int ring_tail;
 } ring_buff;
+
+typedef struct page_buff {
+  void** pages;
+  unsigned int ring_capacity;
+  unsigned int ring_head;
+  unsigned int ring_tail;
+} page_buff;
