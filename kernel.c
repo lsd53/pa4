@@ -360,6 +360,7 @@ void __boot() {
 
     while (1) {
       if (ring_buffer->ring_head != ring_buffer->ring_tail) {
+        // unsigned int pre = current_cpu_cycles();
 
         // access the buffer at the ring slot and retrieve the packet
         struct ring_slot* ring = (struct ring_slot*) ring_buffer->ring_base;
@@ -431,6 +432,8 @@ void __boot() {
         // Increment head since packet was read
         ring[ring_index].dma_len = PAGE_SIZE;
         ring_buffer->ring_tail++;
+
+        // printf("Cycles to analyze packet: %u\n", current_cpu_cycles() - pre);
       }
     }
   }

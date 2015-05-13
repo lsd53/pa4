@@ -63,6 +63,7 @@ void network_poll(struct ring_buff** queues, int cores_reading, struct page_buff
   struct dma_ring_slot* net_driver_slot = (struct dma_ring_slot*) physical_to_virtual(net_driver->rx_base);
   while (1) {
     if (net_driver->rx_head != net_driver->rx_tail) {
+      // unsigned int pre = current_cpu_cycles();
 
       struct ring_buff* q = queues[which_core % cores_reading];
       which_core++;
@@ -100,6 +101,8 @@ void network_poll(struct ring_buff** queues, int cores_reading, struct page_buff
         net_driver_slot[which_packet].dma_base = virtual_to_physical(new_space);
         net_driver_slot[which_packet].dma_len = BUFFER_SIZE;
         net_driver->rx_tail++;
+
+        // printf("Cycles to move to queue: %u\n", current_cpu_cycles() - pre);
       }
     }
   }
