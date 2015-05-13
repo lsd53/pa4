@@ -33,6 +33,7 @@ typedef struct hashtable {
   unsigned int n;           // number of buckets
   unsigned int length;      // the number of integers stored in the list
   unsigned int num_inserts; // the number of insert operations performed so far
+  unsigned int resizing;    // 1 if currently resizing
   int* lock;
 } hashtable;
 

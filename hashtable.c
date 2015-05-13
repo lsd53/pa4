@@ -70,6 +70,7 @@ void hashtable_create(struct hashtable *self) {
   self->n           = STARTING_SIZE;
   self->length      = 0;
   self->num_inserts = 0;
+  self->resizing    = 0;
   self->lock        = (int*) malloc_safe(sizeof(int));
   *(self->lock)     = 0;
 
@@ -92,6 +93,8 @@ void hashtable_put(struct hashtable *self, int key, int value) {
   self->num_inserts++;
 
   if (((double)self->length / (double)self->n) > 0.75) {
+    self->resizing = 1;
+
     // Have to realloc
     self->n *= 2;
     arraylist* new_buckets = arraylist_new();
@@ -129,6 +132,7 @@ void hashtable_put(struct hashtable *self, int key, int value) {
     arraylist_free(self->buckets);
 
     self->buckets = new_buckets;
+    self->resizing = 0;
   }
 
   int which_bucket = h % self->n;
@@ -181,6 +185,8 @@ void hashtable_put_safe(struct hashtable *self, int key, int value) {
   self->num_inserts++;
 
   if (((double)self->length / (double)self->n) > 0.75) {
+    self->resizing = 1;
+
     // Have to realloc
     self->n *= 2;
     arraylist* new_buckets = arraylist_new();
@@ -218,6 +224,7 @@ void hashtable_put_safe(struct hashtable *self, int key, int value) {
     arraylist_free(self->buckets);
 
     self->buckets = new_buckets;
+    self->resizing = 0;
   }
 
   which_bucket = h % self->n;
@@ -311,6 +318,9 @@ void hashtable_stats(struct hashtable *self, char* name) {
 
   unsigned int b;
   unsigned int e;
+
+  // Wait until hashtable is no longer resizing
+  while (self->resizing);
   for (b = 0; b < self->n; b++) {
     arraylist* bucket = arraylist_get(self->buckets, b);
     for (e = 0; e < bucket->length; e++) {
