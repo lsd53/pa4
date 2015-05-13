@@ -120,8 +120,8 @@ unsigned int get_received_bytes() {
 }
 
 unsigned int get_avg_bytes() {
-  printf("%d\n", avg_bytes);
   return avg_bytes;
 }
 
 void network_trap() {}
+
