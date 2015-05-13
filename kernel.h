@@ -146,6 +146,7 @@ void print_stats();
 unsigned int get_dropped_packets();
 unsigned int get_received_packets();
 unsigned int get_received_bytes();
+unsigned int get_avg_bytes();
 
 /* printf.c */
 

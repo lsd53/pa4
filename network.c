@@ -12,7 +12,8 @@
 volatile struct dev_net *net_driver;
 
 unsigned int received_packets = 0;
-unsigned int received_bytes = 0;
+unsigned int received_bytes   = 0;
+unsigned int avg_bytes        = 0;
 
 void network_init(int cores_reading){
   /* Find virtual address of I/0 region for network driver */
@@ -83,6 +84,7 @@ void network_poll(struct ring_buff** queues, int cores_reading, struct ring_buff
         // For global stats
         received_packets++;
         received_bytes += net_driver_slot[which_packet].dma_len;
+        avg_bytes = ((avg_bytes * (received_packets - 1)) + net_driver_slot[which_packet].dma_len) / received_packets;
 
         // Add pointer to packet to specific core ring buffer
         q->ring_base[q_push_idx].dma_base = packet;
@@ -115,6 +117,11 @@ unsigned int get_received_packets() {
 
 unsigned int get_received_bytes() {
   return received_bytes;
+}
+
+unsigned int get_avg_bytes() {
+  printf("%d\n", avg_bytes);
+  return avg_bytes;
 }
 
 void network_trap() {}

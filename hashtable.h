@@ -1,6 +1,6 @@
 #include "kernel.h"
 
-#define STARTING_SIZE 32
+#define STARTING_SIZE 64
 
 typedef struct arraylist {
   void** buffer;            // pointer to allocated memory

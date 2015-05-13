@@ -218,14 +218,16 @@ void print_stats() {
   hashtable_stats(vuln_ports, "dest port");
 
   // Dropped packet stats
-  unsigned int dropped = get_dropped_packets();
-  double pkt_drop_rate = dropped * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles();
-  printf("Dropped packets:\t%d (%f pkts/s)\n", dropped, pkt_drop_rate);
+  unsigned int dropped  = get_dropped_packets();
+  double pkt_drop_rate  = dropped * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles();
+  // double byte_drop_rate = (dropped * get_avg_bytes()) * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles() / (1024 * 1024) * 8;
+  double byte_drop_rate = (pkt_drop_rate * get_avg_bytes()) / 1048576 * 8;
+  printf("Dropped packets:\t%d (%f pkts/s, %f Mbit/s)\n", dropped, pkt_drop_rate, byte_drop_rate);
 
   // Received packet stats
   unsigned int r_pkts  = get_received_packets();
   double pkt_rec_rate  = r_pkts * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles();
-  double byte_rec_rate = get_received_bytes() * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles() / (1024 * 1024) * 8;
+  double byte_rec_rate = get_received_bytes() * (double)CPU_CYCLES_PER_SECOND / current_cpu_cycles() / 1048576 * 8;
   printf("Received packets:\t%d (%f pkts/s, %f Mbit/s)\n", r_pkts, pkt_rec_rate, byte_rec_rate);
 
   puts("");
