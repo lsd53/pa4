@@ -305,8 +305,6 @@ void hashtable_remove(struct hashtable *self, int key) {
 }
 
 void hashtable_stats(struct hashtable *self, char* name) {
-  mutex_lock(self->lock);
-
   printf("\toccurrences\t%s\n", name);
   unsigned int total_occ = 0;
   unsigned int records   = 0;
@@ -326,6 +324,5 @@ void hashtable_stats(struct hashtable *self, char* name) {
   printf("total count:\t%d\n", total_occ);
   printf("entries:\t%d\n", records);
   puts("");
-
-  mutex_unlock(self->lock);
 }
+
