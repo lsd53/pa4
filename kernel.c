@@ -21,7 +21,27 @@ void shutdown() {
 unsigned long djb2(unsigned char *pkt, int n) {
   unsigned long hash = 5381;
   int i = 0;
-  while (i < n-8) {
+  while (i < n-28) {
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
+    hash = hash * 33 + pkt[i++];
     hash = hash * 33 + pkt[i++];
     hash = hash * 33 + pkt[i++];
     hash = hash * 33 + pkt[i++];
